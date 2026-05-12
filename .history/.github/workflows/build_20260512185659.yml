@@ -1,0 +1,56 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        include:
+        - os: ubuntu-latest
+          artifact_name: reconciler-linux
+          asset_name: reconciler-linux.tar.gz
+        - os: windows-latest
+          artifact_name: reconciler-windows
+          asset_name: reconciler-windows.exe
+        - os: macos-latest
+          artifact_name: reconciler-macos
+          asset_name: reconciler-macos.app
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21' # یا نسخه‌ای که استفاده می‌کنی
+
+    # نصب پیش‌نیازهای لینوکس (برای Fyne ضروری است)
+    - name: Install Linux dependencies
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
+    - name: Package Application
+      uses: fyne-io/fyne-action@v1
+      with:
+        name: "ExcelReconciler"
+        target: ${{ matrix.os == 'macos-latest' && 'macos' || matrix.os == 'windows-latest' && 'windows' || 'linux' }}
+
+
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: ${{ matrix.asset_name }}
+        asset_name: ${{ matrix.asset_name }}
+        tag: ${{ github.ref }}
+        overwrite: true
